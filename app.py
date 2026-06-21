@@ -67,47 +67,6 @@ def prepare_model_input(x_original: pd.DataFrame):
     return x_ordered
 
 
-def plot_risk_probability(prob: float, threshold: float = 0.5):
-    """Compact probability bar for the final predicted risk only."""
-    prob = float(np.clip(prob, 0, 1))
-    color = "#C0392B" if prob >= threshold else "#2E86C1"
-
-    fig, ax = plt.subplots(figsize=(8.5, 1.6), dpi=180)
-
-    # Background bar
-    ax.barh([0], [1], color="#EEF2F7", height=0.34, edgecolor="none")
-
-    # Filled probability bar
-    ax.barh([0], [prob], color=color, height=0.34, edgecolor="none")
-
-    # Decision threshold marker
-    ax.axvline(threshold, color="#333333", linewidth=1.5)
-    # Probability label
-    ax.text(
-        prob,
-        -0.34,
-        f"{prob:.1%}",
-        ha="center",
-        va="top",
-        fontsize=11,
-        fontweight="bold",
-        color=color
-    )
-
-    ax.set_xlim(0, 1)
-    ax.set_ylim(-0.65, 0.65)
-    ax.set_yticks([])
-    ax.set_xticks([0, 0.5, 1.0])
-    ax.set_xticklabels(["0%", "50%", "100%"], fontsize=9)
-
-    for spine in ax.spines.values():
-        spine.set_visible(False)
-
-    ax.tick_params(axis="x", length=0)
-    fig.tight_layout()
-    return fig
-
-
 def logistic_contributions(model, x_model) -> pd.DataFrame:
     """Calculate feature contributions on the log-odds scale: coefficient * model input value."""
     if not hasattr(model, "coef_"):
@@ -248,7 +207,7 @@ st.markdown("---")
 predict_btn = st.button("🔮 Predict Risk", width="stretch")
 
 # =========================
-# 8. Prediction result + final probability visualization
+# 8. Prediction result only
 # =========================
 if predict_btn:
     prob = float(model.predict_proba(X_model)[0][1])
@@ -273,6 +232,9 @@ if predict_btn:
 
     st.markdown("---")
 
-    fig = plot_risk_probability(prob)
-    st.pyplot(fig, clear_figure=True, width="content")
-    plt.close(fig)
+
+
+    if pred == 1:
+        st.error("The model classifies this case as High Risk.")
+    else:
+        st.success("The model classifies this case as Low Risk.")
