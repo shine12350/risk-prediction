@@ -1,24 +1,28 @@
 # =========================
-# 0. 页面配置（必须最先）
+# 0. Page config: must be first Streamlit command
 # =========================
 import streamlit as st
+
 st.set_page_config(
     page_title="High Compensation Ratio Risk Prediction Model",
     layout="wide"
 )
 
 # =========================
-# 1. 依赖
+# 1. Dependencies
 # =========================
+import textwrap
+
+import joblib
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import joblib
 
 # =========================
-# 2. 加载逻辑回归模型
-#    兼容两种保存格式：
-#    A. 直接保存 sklearn LogisticRegression
-#    B. 保存为 bundle: {"model": ..., "scaler": ..., "features": ...}
+# 2. Load logistic regression model
+#    Compatible with either:
+#    A. a directly saved sklearn LogisticRegression object
+#    B. a saved bundle: {"model": ..., "scaler": ..., "features": ...}
 # =========================
 MODEL_PATH = "model.pkl"
 
@@ -40,7 +44,7 @@ if not features:
     st.stop()
 
 # =========================
-# 3. 工具函数
+# 3. Helper functions
 # =========================
 def yes_no_to_int(value: str) -> int:
     return 1 if "Yes" in value else 0
@@ -48,23 +52,23 @@ def yes_no_to_int(value: str) -> int:
 
 def disability_grade_to_binary(grade: int) -> int:
     """
-    后端二值化规则：
-    1-4级 -> 1
-    5-10级 -> 0
+    Backend encoding rule:
+    grades 1-4 -> 1
+    grades 5-10 -> 0
     """
     return 1 if 1 <= int(grade) <= 4 else 0
 
 
 def prepare_model_input(x_original: pd.DataFrame):
-    """按训练特征顺序排列；如 bundle 内含 scaler，则先做同样变换。"""
+    """Order features exactly as in training; apply scaler if included in the bundle."""
     x_ordered = x_original.reindex(columns=features)
     if scaler is not None:
         return scaler.transform(x_ordered)
     return x_ordered
 
 
-def logistic_explanation(model, x_model, x_original: pd.DataFrame) -> pd.DataFrame:
-    """返回逻辑回归在 log-odds 尺度上的逐变量贡献。"""
+def logistic_contributions(model, x_model) -> pd.DataFrame:
+    """Calculate feature contributions on the log-odds scale: coefficient * model input value."""
     if not hasattr(model, "coef_"):
         return pd.DataFrame()
 
@@ -77,29 +81,60 @@ def logistic_explanation(model, x_model, x_original: pd.DataFrame) -> pd.DataFra
 
     contributions = coef * model_values
 
-    explanation_df = pd.DataFrame({
+    contribution_df = pd.DataFrame({
         "Feature": features,
-        "Displayed input value": x_original.iloc[0].reindex(features).to_numpy(),
-        "Model input value": model_values,
-        "Coefficient": coef,
-        "Log-odds contribution": contributions,
-        "Odds ratio per 1-unit increase": np.exp(coef),
+        "Contribution": contributions,
     })
 
-    explanation_df["Direction"] = np.where(
-        explanation_df["Log-odds contribution"] >= 0,
-        "Increases high-risk probability",
-        "Decreases high-risk probability"
+    contribution_df["Display feature"] = contribution_df["Feature"].map(pretty_feature_name)
+
+    return contribution_df.sort_values(
+        "Contribution",
+        key=lambda s: s.abs(),
+        ascending=True
     )
 
-    return explanation_df.sort_values(
-        "Log-odds contribution",
-        key=lambda s: s.abs(),
-        ascending=False
+
+def pretty_feature_name(feature: str) -> str:
+    mapping = {
+        "Gender": "Gender",
+        "Age": "Age",
+        "Disability_severity_grade": "Disability severity grade",
+        "Inappropriate_surgical_procedure": "Inappropriate surgical procedure",
+        "Inadequate_medical_records": "Inadequate medical records",
+        "Lack_of_informed_consent": "Lack of informed consent",
+        "Treatment_delay": "Treatment delay",
+        "Inadequate_preoperative_preparation": "Inadequate preoperative preparation",
+    }
+    return mapping.get(feature, feature.replace("_", " "))
+
+
+def plot_contributions(contribution_df: pd.DataFrame):
+    """Horizontal contribution plot with readable variable names."""
+    plot_df = contribution_df.copy()
+    plot_df["Wrapped feature"] = plot_df["Display feature"].apply(
+        lambda x: "\n".join(textwrap.wrap(x, width=28))
     )
+
+    fig_height = max(3.6, 0.45 * len(plot_df) + 1.4)
+    fig, ax = plt.subplots(figsize=(10, fig_height))
+
+    ax.barh(plot_df["Wrapped feature"], plot_df["Contribution"])
+    ax.axvline(0, linewidth=1)
+    ax.set_xlabel("Contribution to predicted high-risk probability on the log-odds scale")
+    ax.set_ylabel("")
+    ax.set_title("Variable Contribution")
+
+    for i, value in enumerate(plot_df["Contribution"]):
+        offset = 0.03 if value >= 0 else -0.03
+        ha = "left" if value >= 0 else "right"
+        ax.text(value + offset, i, f"{value:.2f}", va="center", ha=ha, fontsize=9)
+
+    fig.tight_layout()
+    return fig
 
 # =========================
-# 4. 页面标题
+# 4. Page title
 # =========================
 st.markdown(
     "<h1 style='text-align: center; color: #2E86C1;'>"
@@ -108,10 +143,9 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.caption(f"Current model: {model_name}")
 
 # =========================
-# 5. 输入区域
+# 5. Input area
 # =========================
 col1, col2 = st.columns(2)
 
@@ -125,12 +159,9 @@ with col1:
         max_value=10,
         value=5,
         step=1,
-        help="Backend encoding rule: grades 1–4 are encoded as 1; grades 5–10 are encoded as 0."
+        help="Enter the actual grade only. The app handles the internal model encoding automatically."
     )
-    st.caption(
-        "Backend encoding: disability severity grades 1–4 → 1; grades 5–10 → 0. "
-        "Users should enter the actual grade only."
-    )
+    st.caption("Enter the actual 1–10 grade only; internal model encoding is handled automatically.")
 
     Inappropriate_surgical_procedure = st.selectbox(
         "Inappropriate surgical procedure", ["Yes (1)", "No (0)"]
@@ -151,7 +182,7 @@ with col2:
     )
 
 # =========================
-# 6. 数值化（预测样本）
+# 6. Build prediction sample
 # =========================
 disability_binary = disability_grade_to_binary(Disability_severity_grade_actual)
 
@@ -169,27 +200,16 @@ X_input = pd.DataFrame([{
 X_input = X_input.reindex(columns=features)
 X_model = prepare_model_input(X_input)
 
-with st.expander("Check backend-coded model input"):
-    coded_display = X_input.copy()
-    coded_display.insert(
-        0,
-        "Disability severity grade entered by user",
-        int(Disability_severity_grade_actual)
-    )
-    st.dataframe(coded_display, use_container_width=True, hide_index=True)
-
 # =========================
-# 7. 预测按钮
+# 7. Prediction button
 # =========================
 st.markdown("---")
-predict_btn = st.button("🔮 Predict Risk", use_container_width=True)
+predict_btn = st.button("🔮 Predict Risk", width="stretch")
 
 # =========================
-# 8. 预测 + 结果展示 + 逻辑回归解释
+# 8. Prediction result + variable contribution only
 # =========================
 if predict_btn:
-
-    # -------- 预测结果 --------
     prob = float(model.predict_proba(X_model)[0][1])
     pred = 1 if prob >= 0.5 else 0
 
@@ -209,48 +229,18 @@ if predict_btn:
             value="High Risk" if pred == 1 else "Low Risk"
         )
 
-    st.caption("Classification threshold: predicted probability ≥ 0.500 is classified as High Risk.")
 
-    # -------- 逻辑回归解释 --------
     st.markdown("---")
-    st.subheader("🔍 Logistic Regression Explanation")
+    st.subheader("🔍 Variable Contribution")
 
-    explanation_df = logistic_explanation(model, X_model, X_input)
+    contribution_df = logistic_contributions(model, X_model)
 
-    if explanation_df.empty:
-        st.warning("Coefficient-based explanation is unavailable for this model object.")
+    if contribution_df.empty:
+        st.warning("Variable contribution is unavailable for this model object.")
     else:
-        intercept = float(np.asarray(model.intercept_).reshape(-1)[0])
-        total_log_odds = intercept + explanation_df["Log-odds contribution"].sum()
-        reconstructed_prob = 1 / (1 + np.exp(-np.clip(total_log_odds, -709, 709)))
-
-        col_e1, col_e2, col_e3 = st.columns(3)
-        with col_e1:
-            st.metric("Intercept", f"{intercept:.3f}")
-        with col_e2:
-            st.metric("Total log-odds", f"{total_log_odds:.3f}")
-        with col_e3:
-            st.metric("Probability from log-odds", f"{reconstructed_prob:.3f}")
-
+        fig = plot_contributions(contribution_df)
+        st.pyplot(fig)
+        plt.close(fig)
         st.caption(
-            "For logistic regression, each variable contributes coefficient × model input value "
-            "to the linear predictor on the log-odds scale. Positive contributions push the prediction "
-            "toward high risk; negative contributions push it toward low risk."
-        )
-
-        chart_df = explanation_df[["Feature", "Log-odds contribution"]].set_index("Feature")
-        st.bar_chart(chart_df, use_container_width=True)
-
-        st.dataframe(
-            explanation_df[[
-                "Feature",
-                "Displayed input value",
-                "Model input value",
-                "Coefficient",
-                "Log-odds contribution",
-                "Odds ratio per 1-unit increase",
-                "Direction",
-            ]].round(4),
-            use_container_width=True,
-            hide_index=True
+            "Positive values push the prediction toward high risk; negative values push it toward low risk."
         )

@@ -4,22 +4,37 @@ This Streamlit app uses a logistic regression model to predict high compensation
 
 ## Files
 
-- `app.py`: Streamlit application.
-- `model.pkl`: Logistic regression model bundle. The app supports a bundle with `model`, `scaler`, and `features`.
-- `requirements.txt`: Python dependencies for Streamlit deployment.
+- `app.py`: Streamlit app
+- `model.pkl`: trained logistic regression model bundle
+- `requirements.txt`: Python dependencies
 
-## Key input rule
-
-Users enter the actual disability severity grade from 1 to 10. The app converts this value in the backend:
-
-- Grades 1–4 are encoded as `1`.
-- Grades 5–10 are encoded as `0`.
-
-This avoids asking users to manually choose the binary coding.
-
-## Run locally
+## Local run
 
 ```bash
-pip install -r requirements.txt
 streamlit run app.py
 ```
+
+or
+
+```bash
+python -m streamlit run app.py
+```
+
+## Disability severity encoding
+
+Users enter the actual disability severity grade from 1 to 10.
+
+Backend encoding rule:
+
+- Grades 1–4 are encoded as 1
+- Grades 5–10 are encoded as 0
+
+## Logistic regression explanation
+
+The app shows:
+
+- predicted high-risk probability
+- risk class based on threshold 0.5
+- logistic regression probability curve
+- feature contribution plot on the log-odds scale
+- optional coefficient table
