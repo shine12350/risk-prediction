@@ -158,10 +158,8 @@ with col1:
         min_value=1,
         max_value=10,
         value=5,
-        step=1,
-        help="Enter the actual grade only. The app handles the internal model encoding automatically."
+        step=1
     )
-    st.caption("Enter the actual 1–10 grade only; internal model encoding is handled automatically.")
 
     Inappropriate_surgical_procedure = st.selectbox(
         "Inappropriate surgical procedure", ["Yes (1)", "No (0)"]
