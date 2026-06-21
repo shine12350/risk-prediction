@@ -226,7 +226,7 @@ if predict_btn:
     )
 
     st.markdown(
-        f"""
+        textwrap.dedent(f"""
         <style>
         .result-card {{
             border: 1px solid #E6EAF0;
@@ -345,7 +345,7 @@ if predict_btn:
             </div>
             <div class="result-note">{message}</div>
         </div>
-        """,
+        """),
         unsafe_allow_html=True
     )
 
