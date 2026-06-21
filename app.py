@@ -215,26 +215,137 @@ if predict_btn:
 
     st.subheader("📊 Prediction Result")
 
-    col_r1, col_r2 = st.columns(2)
+    risk_percent = prob * 100
+    risk_level = "High Risk" if pred == 1 else "Low Risk"
+    badge_class = "high-risk" if pred == 1 else "low-risk"
+    bar_color = "#E74C3C" if pred == 1 else "#2E86C1"
+    message = (
+        "The predicted probability is at or above the 0.50 decision threshold."
+        if pred == 1
+        else "The predicted probability is below the 0.50 decision threshold."
+    )
 
-    with col_r1:
-        st.metric(
-            label="Predicted High-risk Probability",
-            value=f"{prob:.3f}"
-        )
+    st.markdown(
+        f"""
+        <style>
+        .result-card {{
+            border: 1px solid #E6EAF0;
+            border-radius: 18px;
+            padding: 26px 30px;
+            background: #FFFFFF;
+            box-shadow: 0 8px 24px rgba(20, 40, 80, 0.06);
+            margin-top: 8px;
+        }}
+        .result-grid {{
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 26px;
+            align-items: center;
+            margin-bottom: 26px;
+        }}
+        .metric-label {{
+            color: #6B7280;
+            font-size: 0.95rem;
+            margin-bottom: 8px;
+        }}
+        .metric-value {{
+            color: #111827;
+            font-size: 2.15rem;
+            font-weight: 700;
+            line-height: 1.1;
+        }}
+        .risk-badge {{
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 999px;
+            font-size: 1.75rem;
+            font-weight: 700;
+            line-height: 1.1;
+        }}
+        .high-risk {{
+            color: #B42318;
+            background: #FEE4E2;
+        }}
+        .low-risk {{
+            color: #175CD3;
+            background: #D1E9FF;
+        }}
+        .viz-title {{
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: #111827;
+            margin-bottom: 12px;
+        }}
+        .prob-bar-bg {{
+            position: relative;
+            height: 18px;
+            width: 100%;
+            border-radius: 999px;
+            background: #EEF2F7;
+            overflow: hidden;
+        }}
+        .prob-bar-fill {{
+            height: 100%;
+            width: {risk_percent:.1f}%;
+            border-radius: 999px;
+            background: {bar_color};
+        }}
+        .threshold-line {{
+            position: absolute;
+            left: 50%;
+            top: 0;
+            height: 100%;
+            width: 2px;
+            background: #111827;
+            opacity: 0.55;
+        }}
+        .bar-scale {{
+            display: flex;
+            justify-content: space-between;
+            color: #6B7280;
+            font-size: 0.85rem;
+            margin-top: 8px;
+        }}
+        .result-note {{
+            margin-top: 14px;
+            padding: 12px 14px;
+            border-radius: 12px;
+            background: #F9FAFB;
+            color: #374151;
+            font-size: 0.95rem;
+        }}
+        @media (max-width: 800px) {{
+            .result-grid {{
+                grid-template-columns: 1fr;
+            }}
+        }}
+        </style>
 
-    with col_r2:
-        st.metric(
-            label="Predicted Risk Level",
-            value="High Risk" if pred == 1 else "Low Risk"
-        )
+        <div class="result-card">
+            <div class="result-grid">
+                <div>
+                    <div class="metric-label">Predicted High-risk Probability</div>
+                    <div class="metric-value">{prob:.3f}</div>
+                </div>
+                <div>
+                    <div class="metric-label">Predicted Risk Level</div>
+                    <div class="risk-badge {badge_class}">{risk_level}</div>
+                </div>
+            </div>
 
-    st.markdown("#### High-risk probability visualization")
-    st.write(f"High-risk probability: **{prob:.1%}**")
-    st.progress(int(round(prob * 100)))
-
-    if pred == 1:
-        st.error("The model classifies this case as High Risk.")
-    else:
-        st.success("The model classifies this case as Low Risk.")
+            <div class="viz-title">High-risk probability visualization: {risk_percent:.1f}%</div>
+            <div class="prob-bar-bg">
+                <div class="prob-bar-fill"></div>
+                <div class="threshold-line"></div>
+            </div>
+            <div class="bar-scale">
+                <span>0%</span>
+                <span>Decision threshold: 50%</span>
+                <span>100%</span>
+            </div>
+            <div class="result-note">{message}</div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
